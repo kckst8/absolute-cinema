@@ -1,29 +1,59 @@
 import "./env";
-import { createAgent, tool } from "langchain";
-import * as z from "zod";
+import { createAgent, HumanMessage, SystemMessage, type BaseMessage } from "langchain";
+import * as readline from "node:readline";
+import { env } from "./env";
+import { movieTools } from "./tools";
 
-async function startAgent() {
-    const getWeather = tool(
-        ({ city }) => `It's always sunny in ${city}!`,
-        {
-            name: "get_weather",
-            description: "Get the weather for a given city",
-            schema: z.object({
-                city: z.string(),
-            }),
-        },
-    );
+const SYSTEM_PROMPT = `You are a personal movie recommender that learns from the user's ratings.
 
+You have tools to search a real movie database (TMDB), inspect movies, save the user's ratings,
+list past ratings, and generate recommendations. Always use a tool rather than relying on memory.
+
+Workflow guidance:
+- When the user mentions a movie title, search for it first to get the canonical TMDB id before doing anything else.
+- When asked to recommend, prefer the recommend_movies tool. Present results as a numbered list with the TMDB id, title, year, and a short reason.
+- After recommending, invite the user to rate any of them by id.
+- For ratings: scale is 0-10 (one decimal allowed). Confirm before saving if the score is ambiguous.
+- Respect any filters the user gives (genre, age rating cap, year range).
+- Be concise. No long preambles.`;
+
+async function main() {
     const agent = createAgent({
-        model: "gpt-4o-mini",
-        tools: [getWeather],
+        model: env.MODEL,
+        tools: movieTools,
     });
 
-    console.log(
-        await agent.invoke({
-            messages: [{ role: "user", content: "What's the weather in Tokyo?" }],
-        })
-    );
+    const history: BaseMessage[] = [new SystemMessage(SYSTEM_PROMPT)];
+
+    const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+    const ask = (q: string) => new Promise<string>((res) => rl.question(q, res));
+
+    console.log("Movie agent ready. Type your message, or 'exit' to quit.\n");
+
+    while (true) {
+        const userInput = (await ask("you > ")).trim();
+        if (!userInput) continue;
+        if (["exit", "quit", ":q"].includes(userInput.toLowerCase())) break;
+
+        history.push(new HumanMessage(userInput));
+
+        try {
+            const result = (await agent.invoke({ messages: history })) as { messages: BaseMessage[] };
+            history.length = 0;
+            history.push(...result.messages);
+            const finalMsg = result.messages[result.messages.length - 1];
+            const text = typeof finalMsg?.content === "string" ? finalMsg.content : JSON.stringify(finalMsg?.content);
+            console.log(`\nagent > ${text}\n`);
+        } catch (err) {
+            console.error(`\n[error] ${(err as Error).message}\n`);
+            history.pop();
+        }
+    }
+
+    rl.close();
 }
 
-startAgent();
+main().catch((e) => {
+    console.error(e);
+    process.exit(1);
+});
