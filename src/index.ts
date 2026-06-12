@@ -28,7 +28,7 @@ async function main() {
     const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
     const ask = (q: string) => new Promise<string>((res) => rl.question(q, res));
 
-    console.log("Movie agent ready. Type your message, or 'exit' to quit.\n");
+    console.log("Hey there. I'm AC. Ask me about movies, give me some ratings, or type 'exit' to quit.\n");
 
     while (true) {
         const userInput = (await ask("you > ")).trim();
@@ -43,7 +43,7 @@ async function main() {
             history.push(...result.messages);
             const finalMsg = result.messages[result.messages.length - 1];
             const text = typeof finalMsg?.content === "string" ? finalMsg.content : JSON.stringify(finalMsg?.content);
-            console.log(`\nagent > ${text}\n`);
+            console.log(`\nAC > ${text}\n`);
         } catch (err) {
             console.error(`\n[error] ${(err as Error).message}\n`);
             history.pop();
