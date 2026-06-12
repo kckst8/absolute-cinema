@@ -1,6 +1,6 @@
 {
-  "name": "langchain-playground",
-  "version": "1.0.0",
+  "name": "absolute-cinema",
+  "version": "0.0.1",
   "description": "Hacking with langchain for Typescript",
   "main": "src/index.ts",
   "scripts": {
